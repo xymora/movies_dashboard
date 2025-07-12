@@ -20,7 +20,13 @@ def load_data():
         d = doc.to_dict()
         d["id"] = doc.id
         data.append(d)
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+
+    # Renombrar 'name' a 'title' si es necesario
+    if "name" in df.columns and "title" not in df.columns:
+        df.rename(columns={"name": "title"}, inplace=True)
+
+    return df
 
 df = load_data()
 
@@ -31,18 +37,14 @@ if df.empty:
 else:
     available_filters = {}
 
-    # Detectar nombre de columna para el título
-    possible_title_cols = ["title", "name", "titulo"]
-    title_col = next((c for c in possible_title_cols if c in df.columns), None)
+    title_col = "title" if "title" in df.columns else None
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
 
-        # Filtro de búsqueda por título (o equivalente), con botón
         search_text = st.text_input("🔎 Buscar por título")
         search_button = st.button("Buscar")
 
-        # Resto de filtros dinámicos
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
             if sel:
@@ -59,28 +61,26 @@ else:
                 available_filters["company"] = sel
 
         for col in df.columns:
-            if col not in ["id", "director", "genre", "company"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
+            if col not in ["id", "director", "genre", "company", "title", "year"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
                 sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
                 if sel:
                     available_filters[col] = sel
 
-        # Si no se encontró columna de título, mostrar aviso
         if not title_col:
-            st.error("No se encontró campo de título en los datos.")
+            st.error("No se encontró campo de título.")
 
-    # Aplicar filtros
     filtered_df = df.copy()
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
-    # Aplicar búsqueda por título solo si existe la columna y se presionó el botón
     if title_col and search_text and search_button:
-        filtered_df = filtered_df[
-            filtered_df[title_col].str.contains(search_text, case=False, na=False)
-        ]
+        filtered_df = filtered_df[filtered_df[title_col].str.contains(search_text, case=False, na=False)]
+
+    hidden_cols = ["title", "year"]
+    display_df = filtered_df.drop(columns=[col for col in hidden_cols if col in filtered_df.columns], errors="ignore")
 
     st.subheader("📋 Películas filtradas")
-    st.dataframe(filtered_df)
+    st.dataframe(display_df)
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
 # ---------------------
@@ -110,7 +110,6 @@ with st.sidebar.form(key="form_movie"):
                 "year": int(new_year)
             }
             db.collection(collection_name).add(doc)
-            # Limpiar el cache para que load_data vuelva a cargar desde Firestore
             st.cache_data.clear()
             st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
             st.experimental_rerun()
