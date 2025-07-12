@@ -31,24 +31,8 @@ if df.empty:
 else:
     available_filters = {}
 
-    # Detectar columna de título
-    possible_title_cols = ["title", "name", "titulo"]
-    title_col = next((c for c in possible_title_cols if c in df.columns), None)
-
     with st.sidebar:
-        st.header("🔍 Filtros personalizados")
-
-        if "search_clicked" not in st.session_state:
-            st.session_state.search_clicked = False
-        if "search_text" not in st.session_state:
-            st.session_state.search_text = ""
-
-        search_text = st.text_input("🔎 Buscar por título", st.session_state.search_text)
-        search_button = st.button("Buscar")
-
-        if search_button:
-            st.session_state.search_clicked = True
-            st.session_state.search_text = search_text
+        st.header("🎛️ Filtros disponibles")
 
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
@@ -65,24 +49,8 @@ else:
             if sel:
                 available_filters["company"] = sel
 
-        for col in df.columns:
-            if col not in ["id", "director", "genre", "company"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
-                sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
-                if sel:
-                    available_filters[col] = sel
-
-        if not title_col:
-            st.error("No se encontró campo de título en los datos.")
-
-    # Aplicar búsqueda
+    # Aplicar filtros
     filtered_df = df.copy()
-
-    if title_col and st.session_state.search_clicked and st.session_state.search_text:
-        filtered_df = filtered_df[
-            filtered_df[title_col].astype(str).str.contains(st.session_state.search_text, case=False, na=False)
-        ]
-
-    # Aplicar filtros dinámicos
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
