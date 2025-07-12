@@ -20,13 +20,17 @@ def load_data():
         d = doc.to_dict()
         d["id"] = doc.id
         data.append(d)
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+    
+    # Forzar mapeo de "name" o "titulo" a "title"
+    if "name" in df.columns:
+        df.rename(columns={"name": "title"}, inplace=True)
+    elif "titulo" in df.columns:
+        df.rename(columns={"titulo": "title"}, inplace=True)
+
+    return df
 
 df = load_data()
-
-# 🔄 Normalizar 'name' a 'title' si es necesario
-if "name" in df.columns and "title" not in df.columns:
-    df.rename(columns={"name": "title"}, inplace=True)
 
 st.title("🎬 Movies Dashboard")
 
@@ -35,17 +39,13 @@ if df.empty:
 else:
     available_filters = {}
 
-    # Se asegura de usar "title" como columna de búsqueda
     title_col = "title" if "title" in df.columns else None
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
-
-        # Filtro de búsqueda por nombre, aunque internamente es 'title'
-        search_text = st.text_input("🔎 Buscar por Name")
+        search_text = st.text_input("🔎 Buscar por Name")  # cambiamos "Title" → "Name"
         search_button = st.button("Buscar")
 
-        # Resto de filtros dinámicos
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
             if sel:
@@ -62,33 +62,30 @@ else:
                 available_filters["company"] = sel
 
         for col in df.columns:
-            if col not in ["id", "title", "director", "genre", "company", "year"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
+            if col not in ["id", "director", "genre", "company", "title"] and df[col].nunique() < 50:
                 sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
                 if sel:
                     available_filters[col] = sel
 
-        # Si no se encontró columna de título, mostrar aviso
         if not title_col:
-            st.error("No se encontró campo de nombre en los datos.")
+            st.error("No se encontró campo de título en los datos.")
 
-    # Aplicar filtros
     filtered_df = df.copy()
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
-    # Aplicar búsqueda por título solo si existe la columna y se presionó el botón
     if title_col and search_text and search_button:
         filtered_df = filtered_df[
             filtered_df[title_col].str.contains(search_text, case=False, na=False)
         ]
 
     st.subheader("📋 Películas filtradas")
-    st.dataframe(filtered_df.drop(columns=["year"], errors="ignore"))  # Oculta 'year' si existe
+    st.dataframe(filtered_df)
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
-# ---------------------
+# ------------------------
 # Formulario para insertar nuevo filme
-# ---------------------
+# ------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎥 Nuevo filme")
 
