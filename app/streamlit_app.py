@@ -38,11 +38,11 @@ else:
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
 
-        # Filtro de búsqueda por título (o equivalente), con botón
+        # Filtro de búsqueda por título (si la columna existe)
         search_text = st.text_input("🔎 Buscar por título")
         search_button = st.button("Buscar")
 
-        # Resto de filtros dinámicos
+        # Filtros adicionales si las columnas existen
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
             if sel:
@@ -64,7 +64,6 @@ else:
                 if sel:
                     available_filters[col] = sel
 
-        # Si no se encontró columna de título, mostrar aviso
         if not title_col:
             st.error("No se encontró campo de título en los datos.")
 
@@ -73,14 +72,16 @@ else:
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
-    # Aplicar búsqueda por título solo si existe la columna y se presionó el botón
+    # Búsqueda por título
     if title_col and search_text and search_button:
-        filtered_df = filtered_df[
-            filtered_df[title_col].str.contains(search_text, case=False, na=False)
-        ]
+        filtered_df = filtered_df[filtered_df[title_col].str.contains(search_text, case=False, na=False)]
+
+    # Ocultar columnas específicas
+    hidden_cols = ["title", "year"]
+    display_df = filtered_df.drop(columns=[col for col in hidden_cols if col in filtered_df.columns], errors="ignore")
 
     st.subheader("📋 Películas filtradas")
-    st.dataframe(filtered_df)
+    st.dataframe(display_df)
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
 # ---------------------
@@ -110,7 +111,6 @@ with st.sidebar.form(key="form_movie"):
                 "year": int(new_year)
             }
             db.collection(collection_name).add(doc)
-            # Limpiar el cache para que load_data vuelva a cargar desde Firestore
             st.cache_data.clear()
             st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
             st.experimental_rerun()
