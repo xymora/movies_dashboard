@@ -18,12 +18,12 @@ def get_data():
     for doc in docs:
         d = doc.to_dict()
         d["id"] = doc.id
-        # Garantizar claves esperadas
-        d.setdefault("title", "")
-        d.setdefault("genre", "")
-        d.setdefault("rating", "")
-        d.setdefault("company", "")
-        d.setdefault("director", "")
+        # Asegurar que todas las claves existan
+        d["title"] = d.get("title", "")
+        d["genre"] = d.get("genre", "")
+        d["rating"] = d.get("rating", "")
+        d["company"] = d.get("company", "")
+        d["director"] = d.get("director", "")
         data.append(d)
     return pd.DataFrame(data)
 
@@ -31,7 +31,6 @@ df = get_data()
 
 # Sidebar con filtros
 st.sidebar.header("🎬 Filtros")
-
 genre_filter = st.sidebar.multiselect("Género", sorted(df["genre"].dropna().unique()))
 company_filter = st.sidebar.multiselect("Compañía", sorted(df["company"].dropna().unique()))
 rating_filter = st.sidebar.multiselect("Rating", sorted(df["rating"].dropna().unique()))
@@ -41,7 +40,7 @@ st.sidebar.markdown("### 🔍 Buscar por título")
 search_title = st.sidebar.text_input("Ingrese nombre o fragmento del título")
 search_button = st.sidebar.button("Buscar")
 
-# Agregar nueva película
+# Formulario para agregar película
 st.sidebar.markdown("### ➕ Agregar nueva película")
 with st.sidebar.form("movie_form"):
     new_title = st.text_input("Título")
@@ -69,19 +68,15 @@ filtered_df = df.copy()
 
 if genre_filter:
     filtered_df = filtered_df[filtered_df["genre"].isin(genre_filter)]
-
 if company_filter:
     filtered_df = filtered_df[filtered_df["company"].isin(company_filter)]
-
 if rating_filter:
     filtered_df = filtered_df[filtered_df["rating"].isin(rating_filter)]
 
-# Búsqueda por título
+# Aplicar búsqueda por título si se presiona el botón
 if search_button and search_title:
     filtered_df = filtered_df[filtered_df["title"].str.contains(search_title, case=False, na=False)]
 
 # Mostrar resultados
 st.markdown("### 📋 Resultados")
-cols = ["title", "company", "director", "genre"]
-available_cols = [col for col in cols if col in filtered_df.columns]
-st.dataframe(filtered_df[available_cols])
+st.dataframe(filtered_df[["title", "company", "director", "genre"]])
