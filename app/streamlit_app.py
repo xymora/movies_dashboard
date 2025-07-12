@@ -16,7 +16,7 @@ try:
 except Exception as e:
     st.warning(f"⚠️ No se pudo inicializar Firebase: {e}")
 
-# Función que intenta leer desde Firestore (pero SIN bloqueo)
+# Función que intenta leer desde Firestore
 def try_firestore_fetch():
     try:
         docs = db.collection(collection_name).limit(50).stream()
@@ -26,19 +26,28 @@ def try_firestore_fetch():
             d["id"] = doc.id
             data.append(d)
         return pd.DataFrame(data)
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
-# Función final que interrumpe si tarda mucho
+# Función principal con fallback a CSV
 @st.cache_data
 def load_data():
     if firestore_active:
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(try_firestore_fetch)
-                return future.result(timeout=5)  # corta en 5 segundos
+                df = future.result(timeout=5)  # máximo 5 segundos
+                if not df.empty:
+                    return df
+                else:
+                    st.warning("⚠️ Firestore respondió vacío. Usando CSV local.")
         except Exception as e:
             st.warning(f"⚠️ Firestore no respondió a tiempo: {e}")
-            return pd.DataFrame()
-    else:
+
+    # Fallback si Firestore falla
+    try:
+        st.info("📂 Cargando datos desde 'movies.csv'...")
+        return pd.read_csv("movies.csv")
+    except Exception as e:
+        st.error(f"❌ No se pudo cargar Firestore ni CSV: {e}")
         return pd.DataFrame()
