@@ -11,21 +11,32 @@ if not firebase_admin._apps:
 db = firestore.client()
 collection_name = "movies"
 
-# Cargar datos desde Firestore
+# Función segura para cargar datos desde Firestore
 @st.cache_data
 def load_data():
-    docs = db.collection(collection_name).stream()
+    docs = db.collection(collection_name).limit(50).stream()
     data = []
     for doc in docs:
-        d = doc.to_dict()
-        d["id"] = doc.id
-        data.append(d)
+        try:
+            d = doc.to_dict()
+            d["id"] = doc.id
+            data.append(d)
+        except Exception as e:
+            st.warning(f"Error al leer documento {doc.id}: {e}")
     return pd.DataFrame(data)
 
+# Cargar datos
 df = load_data()
 
+# Título
 st.title("🎬 Movies Dashboard")
 
+# Mostrar vista previa para depuración
+st.subheader("🧪 Vista previa de datos crudos")
+st.write(df.head())
+st.write("Columnas disponibles:", df.columns.tolist())
+
+# Si no hay datos
 if df.empty:
     st.warning("No hay datos disponibles en Firestore.")
 else:
@@ -60,7 +71,7 @@ else:
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
 # ---------------------
-# Formulario para insertar nuevo filme
+# Formulario para agregar nueva película
 # ---------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎥 Nuevo filme")
