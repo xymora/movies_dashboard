@@ -20,13 +20,7 @@ def load_data():
         d = doc.to_dict()
         d["id"] = doc.id
         data.append(d)
-    df = pd.DataFrame(data)
-
-    # Renombrar 'name' a 'title' si es necesario
-    if "name" in df.columns and "title" not in df.columns:
-        df.rename(columns={"name": "title"}, inplace=True)
-
-    return df
+    return pd.DataFrame(data)
 
 df = load_data()
 
@@ -37,14 +31,18 @@ if df.empty:
 else:
     available_filters = {}
 
-    title_col = "title" if "title" in df.columns else None
+    # Detectar nombre de columna para el título
+    possible_title_cols = ["title", "name", "titulo"]
+    title_col = next((c for c in possible_title_cols if c in df.columns), None)
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
 
+        # Filtro de búsqueda por título (si la columna existe)
         search_text = st.text_input("🔎 Buscar por título")
         search_button = st.button("Buscar")
 
+        # Filtros adicionales si las columnas existen
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
             if sel:
@@ -61,21 +59,24 @@ else:
                 available_filters["company"] = sel
 
         for col in df.columns:
-            if col not in ["id", "director", "genre", "company", "title", "year"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
+            if col not in ["id", "director", "genre", "company"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
                 sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
                 if sel:
                     available_filters[col] = sel
 
         if not title_col:
-            st.error("No se encontró campo de título.")
+            st.error("No se encontró campo de título en los datos.")
 
+    # Aplicar filtros
     filtered_df = df.copy()
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
+    # Búsqueda por título
     if title_col and search_text and search_button:
         filtered_df = filtered_df[filtered_df[title_col].str.contains(search_text, case=False, na=False)]
 
+    # Ocultar columnas específicas
     hidden_cols = ["title", "year"]
     display_df = filtered_df.drop(columns=[col for col in hidden_cols if col in filtered_df.columns], errors="ignore")
 
