@@ -20,7 +20,7 @@ except Exception as e:
 # Intento de carga desde Firestore
 def try_firestore_fetch():
     try:
-        docs = db.collection(collection_name).stream()  # Se quita el límite de 50
+        docs = db.collection(collection_name).stream()  # Sin límite de 50
         data = []
         for doc in docs:
             d = doc.to_dict()
@@ -56,8 +56,12 @@ st.title("🎬 Movies Dashboard")
 if df.empty:
     st.warning("No hay datos disponibles.")
 else:
-    possible_title_cols = ["title", "name", "titulo"]
-    title_col = next((c for c in possible_title_cols if c in df.columns), None)
+    # Asegurar columna uniforme "title"
+    if "name" in df.columns and "title" not in df.columns:
+        df.rename(columns={"name": "title"}, inplace=True)
+    if "titulo" in df.columns and "title" not in df.columns:
+        df.rename(columns={"titulo": "title"}, inplace=True)
+    title_col = "title"
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados")
@@ -113,8 +117,7 @@ with st.sidebar.form(key="form_movie"):
             }
             try:
                 if firestore_active:
-                    doc_ref = db.collection(collection_name).document()
-                    doc_ref.set(new_doc)
+                    db.collection(collection_name).document().set(new_doc)
                     st.cache_data.clear()
                     st.sidebar.success("Película agregada con éxito.")
                     st.experimental_rerun()
