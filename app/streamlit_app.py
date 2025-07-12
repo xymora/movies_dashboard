@@ -21,7 +21,7 @@ def load_data():
         data.append(d)
     df = pd.DataFrame(data)
 
-    # Convertir name en title si title no existe
+    # Convertir "name" en "title" si "title" no existe
     if "name" in df.columns and "title" not in df.columns:
         df.rename(columns={"name": "title"}, inplace=True)
 
@@ -38,12 +38,9 @@ else:
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
-
-        # Búsqueda por título (aunque sea columna name)
         search_text = st.text_input("🔎 Buscar por título")
         search_button = st.button("Buscar")
 
-        # Filtros básicos
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
             if sel:
@@ -59,19 +56,24 @@ else:
             if sel:
                 available_filters["company"] = sel
 
-        # Otros filtros automáticos
-        excluded_cols = ["id", "title", "director", "genre", "company"]
+        if "year" in df.columns:
+            sel = st.multiselect("📆 Año", sorted(df["year"].dropna().unique()))
+            if sel:
+                available_filters["year"] = sel
+
+        excluded = ["id", "title", "director", "genre", "company", "year"]
         for col in df.columns:
-            if col not in excluded_cols and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
+            if col not in excluded and df[col].nunique() < 50:
                 sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
                 if sel:
                     available_filters[col] = sel
 
-    # Filtrado
+    # Aplicar filtros
     filtered_df = df.copy()
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
+    # Aplicar búsqueda por título
     if "title" in filtered_df.columns and search_text and search_button:
         filtered_df = filtered_df[
             filtered_df["title"].str.contains(search_text, case=False, na=False)
@@ -82,9 +84,7 @@ else:
     st.dataframe(filtered_df)
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
-# ---------------------
-# Formulario para insertar nuevo filme
-# ---------------------
+# Formulario para agregar nuevas películas
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎥 Nuevo filme")
 
