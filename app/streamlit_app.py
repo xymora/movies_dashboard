@@ -11,7 +11,7 @@ if not firebase_admin._apps:
 db = firestore.client()
 collection_name = "movies"
 
-# Función para cargar datos desde Firestore
+# Cargar datos desde Firestore
 @st.cache_data
 def load_data():
     docs = db.collection(collection_name).stream()
@@ -31,16 +31,24 @@ if df.empty:
 else:
     available_filters = {}
 
-    # Detectar nombre de columna para el título
+    # Detectar columna de título
     possible_title_cols = ["title", "name", "titulo"]
     title_col = next((c for c in possible_title_cols if c in df.columns), None)
 
     with st.sidebar:
-        st.header("🔍 Filtros personalizados y dinámicos")
+        st.header("🔍 Filtros personalizados")
 
-        # Campo de búsqueda con botón
-        search_text = st.text_input("🔎 Buscar por título")
+        if "search_clicked" not in st.session_state:
+            st.session_state.search_clicked = False
+        if "search_text" not in st.session_state:
+            st.session_state.search_text = ""
+
+        search_text = st.text_input("🔎 Buscar por título", st.session_state.search_text)
         search_button = st.button("Buscar")
+
+        if search_button:
+            st.session_state.search_clicked = True
+            st.session_state.search_text = search_text
 
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
@@ -66,16 +74,15 @@ else:
         if not title_col:
             st.error("No se encontró campo de título en los datos.")
 
-    # Copiar DF completo
+    # Aplicar búsqueda
     filtered_df = df.copy()
 
-    # Aplicar búsqueda por título si se presionó el botón
-    if title_col and search_text and search_button:
+    if title_col and st.session_state.search_clicked and st.session_state.search_text:
         filtered_df = filtered_df[
-            filtered_df[title_col].astype(str).str.contains(search_text, case=False, na=False)
+            filtered_df[title_col].astype(str).str.contains(st.session_state.search_text, case=False, na=False)
         ]
 
-    # Aplicar otros filtros
+    # Aplicar filtros dinámicos
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
