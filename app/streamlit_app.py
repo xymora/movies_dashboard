@@ -2,28 +2,41 @@ import streamlit as st
 import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore
+import time
 
 # Inicializar Firebase
-if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_key.json")
-    firebase_admin.initialize_app(cred)
+try:
+    if not firebase_admin._apps:
+        cred = credentials.Certificate("firebase_key.json")
+        firebase_admin.initialize_app(cred)
 
-db = firestore.client()
-collection_name = "movies"
+    db = firestore.client()
+    collection_name = "movies"
+    firestore_active = True
+except Exception as e:
+    st.warning(f"⚠️ No se pudo conectar a Firebase: {e}")
+    firestore_active = False
 
-# Función segura para cargar datos desde Firestore
+# Función segura para cargar datos desde Firestore (corte en 5 segundos)
 @st.cache_data
 def load_data():
-    docs = db.collection(collection_name).limit(50).stream()
-    data = []
-    for doc in docs:
+    if firestore_active:
+        data = []
         try:
-            d = doc.to_dict()
-            d["id"] = doc.id
-            data.append(d)
+            start_time = time.time()
+            docs = db.collection(collection_name).limit(50).stream()
+            for doc in docs:
+                if time.time() - start_time > 5:
+                    raise TimeoutError("⏱️ Firestore tardó demasiado.")
+                d = doc.to_dict()
+                d["id"] = doc.id
+                data.append(d)
+            return pd.DataFrame(data)
         except Exception as e:
-            st.warning(f"Error al leer documento {doc.id}: {e}")
-    return pd.DataFrame(data)
+            st.warning(f"⚠️ Error al leer Firestore: {e}")
+            return pd.DataFrame()
+    else:
+        return pd.DataFrame()
 
 # Cargar datos
 df = load_data()
@@ -96,7 +109,10 @@ with st.sidebar.form(key="form_movie"):
                 "company": new_company,
                 "year": int(new_year)
             }
-            db.collection(collection_name).add(doc)
-            st.cache_data.clear()
-            st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
-            st.experimental_rerun()
+            if firestore_active:
+                db.collection(collection_name).add(doc)
+                st.cache_data.clear()
+                st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
+                st.experimental_rerun()
+            else:
+                st.sidebar.error("🚫 No se pudo guardar. Firestore está inactivo.")
