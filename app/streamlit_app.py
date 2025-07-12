@@ -43,7 +43,6 @@ def load_data():
                 st.warning("Firestore devolvió datos vacíos. Usando CSV.")
         except:
             st.warning("⏱️ Firestore no respondió. Usando CSV.")
-    # Fallback
     try:
         return pd.read_csv("movies.csv")
     except:
@@ -97,24 +96,27 @@ with st.sidebar.form(key="form_movie"):
     new_director = st.text_input("Director")
     new_genre = st.text_input("Género")
     new_company = st.text_input("Compañía")
-    new_year = st.number_input("Año", min_value=1900, max_value=2100, step=1)
+    new_year = st.number_input("Año", min_value=1900, max_value=2100, step=1, format="%d")
     submit_btn = st.form_submit_button("Agregar")
 
     if submit_btn:
-        if not new_title:
-            st.sidebar.error("El título es obligatorio.")
+        if not new_title.strip():
+            st.sidebar.error("❗ El título es obligatorio.")
         else:
             new_doc = {
-                "title": new_title,
-                "director": new_director,
-                "genre": new_genre,
-                "company": new_company,
+                "title": new_title.strip(),
+                "director": new_director.strip(),
+                "genre": new_genre.strip(),
+                "company": new_company.strip(),
                 "year": int(new_year)
             }
-            if firestore_active:
-                db.collection(collection_name).add(new_doc)
-                st.cache_data.clear()
-                st.sidebar.success("Película agregada con éxito.")
-                st.experimental_rerun()
-            else:
-                st.sidebar.error("🚫 Firestore inactivo. No se pudo guardar.")
+            try:
+                if firestore_active:
+                    db.collection(collection_name).add(new_doc)
+                    st.cache_data.clear()
+                    st.sidebar.success("✅ Película agregada con éxito.")
+                    st.experimental_rerun()
+                else:
+                    st.sidebar.error("🚫 Firestore inactivo. No se pudo guardar.")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error al guardar: {e}")
