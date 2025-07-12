@@ -38,7 +38,9 @@ else:
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
 
+        # Campo de búsqueda con botón
         search_text = st.text_input("🔎 Buscar por título")
+        search_button = st.button("Buscar")
 
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
@@ -64,17 +66,20 @@ else:
         if not title_col:
             st.error("No se encontró campo de título en los datos.")
 
-    # Primero aplicar búsqueda por título
+    # Copiar DF completo
     filtered_df = df.copy()
-    if title_col and search_text:
+
+    # Aplicar búsqueda por título si se presionó el botón
+    if title_col and search_text and search_button:
         filtered_df = filtered_df[
-            filtered_df[title_col].str.contains(search_text, case=False, na=False)
+            filtered_df[title_col].astype(str).str.contains(search_text, case=False, na=False)
         ]
 
-    # Luego aplicar filtros restantes
+    # Aplicar otros filtros
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
+    # Mostrar resultados
     st.subheader("📋 Películas filtradas")
     st.dataframe(filtered_df)
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
