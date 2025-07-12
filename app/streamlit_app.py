@@ -11,106 +11,72 @@ if not firebase_admin._apps:
 db = firestore.client()
 collection_name = "movies"
 
-# Función para cargar datos desde Firestore
-@st.cache_data
-def load_data():
+# Leer datos desde Firestore
+def get_data():
     docs = db.collection(collection_name).stream()
     data = []
     for doc in docs:
         d = doc.to_dict()
         d["id"] = doc.id
+        # Asegurar que todas las claves existan
+        d["title"] = d.get("title", "")
+        d["genre"] = d.get("genre", "")
+        d["rating"] = d.get("rating", "")
+        d["company"] = d.get("company", "")
+        d["director"] = d.get("director", "")
         data.append(d)
     return pd.DataFrame(data)
 
-df = load_data()
+df = get_data()
 
-st.title("🎬 Movies Dashboard")
+# Sidebar con filtros
+st.sidebar.header("🎬 Filtros")
+genre_filter = st.sidebar.multiselect("Género", sorted(df["genre"].dropna().unique()))
+company_filter = st.sidebar.multiselect("Compañía", sorted(df["company"].dropna().unique()))
+rating_filter = st.sidebar.multiselect("Rating", sorted(df["rating"].dropna().unique()))
 
-if df.empty:
-    st.warning("No hay datos disponibles en Firestore.")
-else:
-    available_filters = {}
+# Búsqueda por título
+st.sidebar.markdown("### 🔍 Buscar por título")
+search_title = st.sidebar.text_input("Ingrese nombre o fragmento del título")
+search_button = st.sidebar.button("Buscar")
 
-    # Detectar nombre de columna para el título
-    possible_title_cols = ["title", "name", "titulo"]
-    title_col = next((c for c in possible_title_cols if c in df.columns), None)
-
-    with st.sidebar:
-        st.header("🔍 Filtros personalizados y dinámicos")
-
-        # Filtro de búsqueda por título (o equivalente), con botón
-        search_text = st.text_input("🔎 Buscar por título")
-        search_button = st.button("Buscar")
-
-        # Resto de filtros dinámicos
-        if "director" in df.columns:
-            sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
-            if sel:
-                available_filters["director"] = sel
-
-        if "genre" in df.columns:
-            sel = st.multiselect("🎭 Género", sorted(df["genre"].dropna().unique()))
-            if sel:
-                available_filters["genre"] = sel
-
-        if "company" in df.columns:
-            sel = st.multiselect("🏢 Compañía", sorted(df["company"].dropna().unique()))
-            if sel:
-                available_filters["company"] = sel
-
-        for col in df.columns:
-            if col not in ["id", "director", "genre", "company"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
-                sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
-                if sel:
-                    available_filters[col] = sel
-
-        # Si no se encontró columna de título, mostrar aviso
-        if not title_col:
-            st.error("No se encontró campo de título en los datos.")
-
-    # Aplicar filtros
-    filtered_df = df.copy()
-    for col, vals in available_filters.items():
-        filtered_df = filtered_df[filtered_df[col].isin(vals)]
-
-    # Aplicar búsqueda por título solo si existe la columna y se presionó el botón
-    if title_col and search_text and search_button:
-        filtered_df = filtered_df[
-            filtered_df[title_col].str.contains(search_text, case=False, na=False)
-        ]
-
-    st.subheader("📋 Películas filtradas")
-    st.dataframe(filtered_df)
-    st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
-
-# ---------------------
-# Formulario para insertar nuevo filme
-# ---------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎥 Nuevo filme")
-
-with st.sidebar.form(key="form_movie"):
+# Formulario para agregar película
+st.sidebar.markdown("### ➕ Agregar nueva película")
+with st.sidebar.form("movie_form"):
     new_title = st.text_input("Título")
-    new_director = st.text_input("Director")
     new_genre = st.text_input("Género")
+    new_rating = st.text_input("Rating")
     new_company = st.text_input("Compañía")
-    new_year = st.number_input("Año", min_value=1900, max_value=2100, step=1)
+    new_director = st.text_input("Director")
+    submitted = st.form_submit_button("Guardar")
 
-    submit_btn = st.form_submit_button("Agregar")
+    if submitted and new_title:
+        db.collection(collection_name).add({
+            "title": new_title,
+            "genre": new_genre,
+            "rating": new_rating,
+            "company": new_company,
+            "director": new_director
+        })
+        st.sidebar.success("Película guardada. Recarga la app para verla.")
 
-    if submit_btn:
-        if not new_title:
-            st.sidebar.error("El título es obligatorio.")
-        else:
-            doc = {
-                "title": new_title,
-                "director": new_director,
-                "genre": new_genre,
-                "company": new_company,
-                "year": int(new_year)
-            }
-            db.collection(collection_name).add(doc)
-            # Limpiar el cache para que load_data vuelva a cargar desde Firestore
-            st.cache_data.clear()
-            st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
-            st.experimental_rerun()
+# Título principal
+st.title("🎥 Dashboard de Películas")
+
+# Aplicar filtros
+filtered_df = df.copy()
+
+if genre_filter:
+    filtered_df = filtered_df[filtered_df["genre"].isin(genre_filter)]
+if company_filter:
+    filtered_df = filtered_df[filtered_df["company"].isin(company_filter)]
+if rating_filter:
+    filtered_df = filtered_df[filtered_df["rating"].isin(rating_filter)]
+
+# Aplicar búsqueda por título si se presiona el botón
+if search_button and search_title:
+    filtered_df = filtered_df[filtered_df["title"].str.contains(search_title, case=False, na=False)]
+
+# Mostrar resultados
+st.markdown("### 📋 Resultados")
+st.dataframe(filtered_df[["title", "company", "director", "genre"]])
