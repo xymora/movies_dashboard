@@ -24,6 +24,10 @@ def load_data():
 
 df = load_data()
 
+# 🔄 Normalizar 'name' a 'title' si es necesario
+if "name" in df.columns and "title" not in df.columns:
+    df.rename(columns={"name": "title"}, inplace=True)
+
 st.title("🎬 Movies Dashboard")
 
 if df.empty:
@@ -31,15 +35,14 @@ if df.empty:
 else:
     available_filters = {}
 
-    # Detectar nombre de columna para el título
-    possible_title_cols = ["title", "name", "titulo"]
-    title_col = next((c for c in possible_title_cols if c in df.columns), None)
+    # Se asegura de usar "title" como columna de búsqueda
+    title_col = "title" if "title" in df.columns else None
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
 
-        # Filtro de búsqueda por título (o equivalente), con botón
-        search_text = st.text_input("🔎 Buscar por título")
+        # Filtro de búsqueda por nombre, aunque internamente es 'title'
+        search_text = st.text_input("🔎 Buscar por Name")
         search_button = st.button("Buscar")
 
         # Resto de filtros dinámicos
@@ -59,14 +62,14 @@ else:
                 available_filters["company"] = sel
 
         for col in df.columns:
-            if col not in ["id", "director", "genre", "company"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
+            if col not in ["id", "title", "director", "genre", "company", "year"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
                 sel = st.multiselect(f"{col.capitalize()}", sorted(df[col].dropna().unique()))
                 if sel:
                     available_filters[col] = sel
 
         # Si no se encontró columna de título, mostrar aviso
         if not title_col:
-            st.error("No se encontró campo de título en los datos.")
+            st.error("No se encontró campo de nombre en los datos.")
 
     # Aplicar filtros
     filtered_df = df.copy()
@@ -80,7 +83,7 @@ else:
         ]
 
     st.subheader("📋 Películas filtradas")
-    st.dataframe(filtered_df)
+    st.dataframe(filtered_df.drop(columns=["year"], errors="ignore"))  # Oculta 'year' si existe
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
 # ---------------------
@@ -110,7 +113,6 @@ with st.sidebar.form(key="form_movie"):
                 "year": int(new_year)
             }
             db.collection(collection_name).add(doc)
-            # Limpiar el cache para que load_data vuelva a cargar desde Firestore
             st.cache_data.clear()
             st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
             st.experimental_rerun()
