@@ -17,10 +17,10 @@ except Exception as e:
     st.warning(f"⚠️ Firebase error: {e}")
     firestore_active = False
 
-# Intento de carga desde Firestore
+# Carga de Firestore sin límite
 def try_firestore_fetch():
     try:
-        docs = db.collection(collection_name).stream()  # Sin límite de 50
+        docs = db.collection(collection_name).stream()
         data = []
         for doc in docs:
             d = doc.to_dict()
@@ -30,7 +30,6 @@ def try_firestore_fetch():
     except:
         return pd.DataFrame()
 
-# Función definitiva con fallback
 @st.cache_data
 def load_data():
     if firestore_active:
@@ -43,11 +42,10 @@ def load_data():
                 st.warning("Firestore devolvió datos vacíos. Se usa CSV.")
         except:
             st.warning("⏱️ Firestore no respondió. Usando CSV.")
-    # Fallback
     try:
         return pd.read_csv("movies.csv")
     except:
-        st.error("❌ No se pudo cargar ni Firestore ni movies.csv")
+        st.error("❌ No se pudo cargar ni Firestore ni movies.csv.")
         return pd.DataFrame()
 
 df = load_data()
@@ -56,16 +54,18 @@ st.title("🎬 Movies Dashboard")
 if df.empty:
     st.warning("No hay datos disponibles.")
 else:
-    # Asegurar columna uniforme "title"
-    if "name" in df.columns and "title" not in df.columns:
-        df.rename(columns={"name": "title"}, inplace=True)
-    if "titulo" in df.columns and "title" not in df.columns:
-        df.rename(columns={"titulo": "title"}, inplace=True)
+    # 🔧 Unificar nombre de columna de título
+    if "title" not in df.columns:
+        if "name" in df.columns:
+            df["title"] = df["name"]
+        elif "titulo" in df.columns:
+            df["title"] = df["titulo"]
+        else:
+            df["title"] = ""
     title_col = "title"
 
     with st.sidebar:
         st.header("🔍 Filtros personalizados")
-
         search_text = st.text_input("🔎 Buscar por título")
         search_button = st.button("Buscar")
 
@@ -78,21 +78,21 @@ else:
 
     filtered_df = df.copy()
 
-    # Búsqueda por título
+    # Aplicar búsqueda por título
     if title_col and search_text and search_button:
         filtered_df = filtered_df[filtered_df[title_col].astype(str).str.contains(search_text, case=False, na=False)]
 
-    # Filtros dinámicos
+    # Aplicar filtros dinámicos
     for col, vals in filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
     st.subheader("📋 Películas filtradas")
-    st.dataframe(filtered_df)
+    st.dataframe(filtered_df[["title", "company", "director", "genre", "id"]])
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
-# --------------------------
-# Formulario para agregar nueva película
-# --------------------------
+# -------------------------
+# 📥 Formulario para nueva película
+# -------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎥 Nuevo filme")
 
