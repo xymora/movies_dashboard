@@ -20,7 +20,7 @@ except Exception as e:
 # Intento de carga desde Firestore
 def try_firestore_fetch():
     try:
-        docs = db.collection(collection_name).limit(50).stream()
+        docs = db.collection(collection_name).stream()  # Se quita el límite de 50
         data = []
         for doc in docs:
             d = doc.to_dict()
@@ -40,7 +40,7 @@ def load_data():
                 df = future.result(timeout=5)
                 if not df.empty:
                     return df
-                st.warning("Firestore devolvió datos vacíos. Usando CSV.")
+                st.warning("Firestore devolvió datos vacíos. Se usa CSV.")
         except:
             st.warning("⏱️ Firestore no respondió. Usando CSV.")
     # Fallback
