@@ -38,11 +38,8 @@ else:
     with st.sidebar:
         st.header("🔍 Filtros personalizados y dinámicos")
 
-        # Filtro de búsqueda por título (o equivalente), con botón
         search_text = st.text_input("🔎 Buscar por título")
-        search_button = st.button("Buscar")
 
-        # Resto de filtros dinámicos
         if "director" in df.columns:
             sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
             if sel:
@@ -64,20 +61,19 @@ else:
                 if sel:
                     available_filters[col] = sel
 
-        # Si no se encontró columna de título, mostrar aviso
         if not title_col:
             st.error("No se encontró campo de título en los datos.")
 
-    # Aplicar filtros
+    # Primero aplicar búsqueda por título
     filtered_df = df.copy()
-    for col, vals in available_filters.items():
-        filtered_df = filtered_df[filtered_df[col].isin(vals)]
-
-    # Aplicar búsqueda por título solo si existe la columna y se presionó el botón
-    if title_col and search_text and search_button:
+    if title_col and search_text:
         filtered_df = filtered_df[
             filtered_df[title_col].str.contains(search_text, case=False, na=False)
         ]
+
+    # Luego aplicar filtros restantes
+    for col, vals in available_filters.items():
+        filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
     st.subheader("📋 Películas filtradas")
     st.dataframe(filtered_df)
@@ -110,7 +106,6 @@ with st.sidebar.form(key="form_movie"):
                 "year": int(new_year)
             }
             db.collection(collection_name).add(doc)
-            # Limpiar el cache para que load_data vuelva a cargar desde Firestore
             st.cache_data.clear()
             st.sidebar.success(f"Película '{new_title}' agregada exitosamente.")
             st.experimental_rerun()
