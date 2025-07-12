@@ -11,66 +11,67 @@ if not firebase_admin._apps:
 db = firestore.client()
 collection_name = "movies"
 
-# Función para cargar datos desde Firestore
+# Función segura para cargar datos desde Firestore
 @st.cache_data
 def load_data():
-    docs = db.collection(collection_name).stream()
+    docs = db.collection(collection_name).limit(50).stream()
     data = []
     for doc in docs:
-        d = doc.to_dict()
-        d["id"] = doc.id
-        data.append(d)
-    df = pd.DataFrame(data)
+        try:
+            d = doc.to_dict()
+            d["id"] = doc.id
+            data.append(d)
+        except Exception as e:
+            st.warning(f"Error al leer documento {doc.id}: {e}")
+    return pd.DataFrame(data)
 
-    # Normalizar nombre de columna para búsqueda
-    if "name" in df.columns and "title" not in df.columns:
-        df.rename(columns={"name": "title"}, inplace=True)
-    return df
-
+# Cargar datos
 df = load_data()
 
+# Título
 st.title("🎬 Movies Dashboard")
 
+# Mostrar vista previa para depuración
+st.subheader("🧪 Vista previa de datos crudos")
+st.write(df.head())
+st.write("Columnas disponibles:", df.columns.tolist())
+
+# Si no hay datos
 if df.empty:
     st.warning("No hay datos disponibles en Firestore.")
 else:
     available_filters = {}
 
     with st.sidebar:
-        st.header("🔍 Filtros personalizados y dinámicos")
+        st.header("🎛️ Filtros disponibles")
 
-        # Filtro de búsqueda por título
-        search_text = st.text_input("🔎 Buscar por Título")
+        if "director" in df.columns:
+            sel = st.multiselect("🎬 Director", sorted(df["director"].dropna().unique()))
+            if sel:
+                available_filters["director"] = sel
 
-        # Filtros dinámicos
-        for col in df.columns:
-            if col in ["director", "genre", "company"]:
-                sel = st.multiselect(col.capitalize(), sorted(df[col].dropna().unique()))
-                if sel:
-                    available_filters[col] = sel
-            elif col not in ["id", "title"] and df[col].nunique() < 50 and df[col].dtype in [object, int, float]:
-                sel = st.multiselect(col.capitalize(), sorted(df[col].dropna().unique()))
-                if sel:
-                    available_filters[col] = sel
+        if "genre" in df.columns:
+            sel = st.multiselect("🎭 Género", sorted(df["genre"].dropna().unique()))
+            if sel:
+                available_filters["genre"] = sel
+
+        if "company" in df.columns:
+            sel = st.multiselect("🏢 Compañía", sorted(df["company"].dropna().unique()))
+            if sel:
+                available_filters["company"] = sel
 
     # Aplicar filtros
     filtered_df = df.copy()
     for col, vals in available_filters.items():
         filtered_df = filtered_df[filtered_df[col].isin(vals)]
 
-    # Aplicar búsqueda por título directamente
-    if "title" in filtered_df.columns and search_text:
-        filtered_df = filtered_df[filtered_df["title"].str.contains(search_text, case=False, na=False)]
-
+    # Mostrar resultados
     st.subheader("📋 Películas filtradas")
-
-    # Evitar error por columnas duplicadas
-    filtered_df = filtered_df.loc[:, ~filtered_df.columns.duplicated()]
     st.dataframe(filtered_df)
     st.markdown(f"🎯 Total encontradas: **{len(filtered_df)}**")
 
 # ---------------------
-# Formulario para insertar nuevo filme
+# Formulario para agregar nueva película
 # ---------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎥 Nuevo filme")
